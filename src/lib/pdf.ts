@@ -94,7 +94,7 @@ export function exportProposalAsPDF(
 
   // Footer / Notes
   // @ts-expect-error - jspdf-autotable adds lastAutoTable to the doc
-  const lastAutoTable = (doc as any).lastAutoTable;
+  const lastAutoTable = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable;
   const finalY = lastAutoTable?.finalY || 150;
   if (ev.notes) {
     doc.setFont("helvetica", "bold");

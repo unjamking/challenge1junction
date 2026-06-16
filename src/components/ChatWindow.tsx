@@ -3,7 +3,7 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
-import { Send, Loader2, Sparkles } from "lucide-react";
+import { Send, Loader2, Sparkles, User, Paperclip, CornerDownLeft } from "lucide-react";
 import { saveMessage, renameThread, deriveTitle } from "@/lib/threads";
 
 interface ChatWindowProps {
@@ -84,22 +84,41 @@ export function ChatWindow({ threadId, initialMessages, initialTitle }: ChatWind
   const isBusy = status === "submitted" || status === "streaming";
 
   return (
-    <div className="flex h-full flex-col">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto bg-grain">
-        <div className="mx-auto max-w-3xl px-6 py-10">
+    <div className="relative flex h-full flex-col overflow-hidden bg-background/20">
+      {/* BACKGROUND DECOR */}
+      <div className="absolute inset-0 z-0 opacity-10 pointer-events-none">
+        <div className="absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-primary/30 blur-[128px]" />
+        <div className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-accent/20 blur-[128px]" />
+      </div>
+
+      <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto px-6 py-10">
+        <div className="mx-auto max-w-3xl">
           {messages.length === 0 && <EmptyState />}
-          <div className="space-y-6">
+          <div className="space-y-8">
             {messages.map((m) => (
               <MessageBubble key={m.id} message={m} />
             ))}
-            {status === "submitted" && (
-              <div className="flex items-center gap-2 pl-1 text-xs text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                Drafting response…
+
+            {isBusy && (
+              <div className="flex justify-start animate-in fade-in slide-in-from-left-2 duration-300">
+                <div className="flex max-w-[85%] gap-4">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary ring-1 ring-primary/30 shadow-lg">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                  <div className="rounded-2xl bg-white/5 px-5 py-4 backdrop-blur-md ring-1 ring-white/5 shadow-2xl">
+                    <div className="flex gap-1.5">
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.3s]" />
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.15s]" />
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-bounce" />
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
+
             {error && (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <div className="rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-lg animate-in shake duration-500">
+                <p className="font-bold uppercase tracking-widest text-[10px] mb-1">System Error</p>
                 {error.message}
               </div>
             )}
@@ -107,29 +126,63 @@ export function ChatWindow({ threadId, initialMessages, initialTitle }: ChatWind
         </div>
       </div>
 
-      <div className="border-t border-border bg-card/40 backdrop-blur">
-        <div className="mx-auto max-w-3xl px-6 py-4">
-          <div className="relative rounded-xl border border-border bg-background shadow-sm focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/30">
+      <div className="relative z-10 p-6 pt-0">
+        <div className="mx-auto max-w-3xl">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSend();
+            }}
+            className="glass-card group flex flex-col gap-2 rounded-2xl p-2 ring-1 ring-white/10 shadow-[0_0_64px_rgba(0,0,0,0.4)] transition-all duration-300 focus-within:ring-primary/40 focus-within:shadow-[0_0_64px_rgba(249,115,22,0.1)]"
+          >
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="Describe an event request, ask a question, or paste a client inquiry…"
-              rows={3}
-              className="w-full resize-none bg-transparent px-4 py-3 pr-14 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none"
+              placeholder="Describe an event, ask a question, or paste an inquiry..."
+              rows={2}
+              className="w-full resize-none bg-transparent px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
             />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || isBusy}
-              className="absolute bottom-2.5 right-2.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Send"
-            >
-              {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </button>
-          </div>
-          <p className="mt-2 px-1 text-[11px] text-muted-foreground">
-            Enter to send · Shift + Enter for new line
+            <div className="flex items-center justify-between border-t border-white/5 p-1 pt-2">
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  className="rounded-lg p-2 text-muted-foreground/60 hover:bg-white/5 hover:text-primary transition-all"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg p-2 text-muted-foreground/60 hover:bg-white/5 hover:text-primary transition-all"
+                >
+                  <Sparkles className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground/40 hidden sm:inline-block">
+                  Press{" "}
+                  <kbd className="rounded border border-white/10 bg-white/5 px-1 px-0.5 text-[9px]">
+                    Enter
+                  </kbd>{" "}
+                  to send
+                </span>
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isBusy}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:grayscale disabled:hover:scale-100"
+                >
+                  {isBusy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
+          <p className="mt-3 text-center text-[9px] uppercase tracking-[0.3em] text-muted-foreground/20">
+            Tirana Elite Operations Concierge · AI Powered
           </p>
         </div>
       </div>
@@ -141,55 +194,69 @@ function MessageBubble({ message }: { message: UIMessage }) {
   const isUser = message.role === "user";
   const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
 
-  if (isUser) {
-    return (
-      <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-4 py-3 text-sm text-primary-foreground shadow-sm">
-          <p className="whitespace-pre-wrap">{text}</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex gap-3">
-      <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-primary/40 bg-primary/10 text-primary">
-        <Sparkles className="h-4 w-4" />
-      </div>
-      <div className="prose-chat min-w-0 flex-1 text-sm text-foreground">
-        <ReactMarkdown>{text}</ReactMarkdown>
+    <div
+      className={`flex w-full animate-in fade-in slide-in-from-bottom-2 duration-500 ${
+        isUser ? "justify-end" : "justify-start"
+      }`}
+    >
+      <div className={`flex max-w-[90%] gap-4 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
+        <div
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow-lg transition-transform duration-300 hover:scale-110 ${
+            isUser
+              ? "bg-accent/20 text-accent ring-1 ring-accent/30"
+              : "bg-primary/20 text-primary ring-1 ring-primary/30"
+          }`}
+        >
+          {isUser ? <User className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+        </div>
+        <div
+          className={`rounded-2xl px-6 py-4 shadow-2xl transition-all duration-300 ${
+            isUser
+              ? "glass-card text-foreground ring-1 ring-white/10"
+              : "bg-white/5 text-foreground ring-1 ring-white/5 backdrop-blur-md"
+          }`}
+        >
+          <div className="prose-chat whitespace-pre-wrap">
+            <ReactMarkdown>{text}</ReactMarkdown>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 const SAMPLE_PROMPTS = [
-  "Wedding reception for 180 guests on a Saturday in June, with live band and dinner.",
-  "International tech conference, 3 days, ~500 attendees, plus breakout workshops.",
-  "Rooftop product launch cocktail for 200 — late September, around 19:00.",
+  "Corporate gala for 300, premium catering, live string quartet.",
+  "Tech summit workshop series, breakout rooms, high-speed WiFi.",
+  "Sunset cocktail launch on the Rooftop, 150 guests, minimalist decor.",
 ];
 
 function EmptyState() {
   return (
-    <div className="py-12 text-center">
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-primary/40 bg-primary/10 text-primary">
-        <Sparkles className="h-5 w-5" />
+    <div className="py-12 text-center animate-in fade-in zoom-in-95 duration-700">
+      <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-[2rem] bg-primary/10 shadow-[0_0_40px_rgba(249,115,22,0.1)] ring-1 ring-primary/20">
+        <Sparkles className="h-10 w-10 text-primary" />
       </div>
-      <h2 className="text-display text-2xl font-semibold text-foreground">
-        Event Operations Assistant
+      <h2 className="text-display text-4xl font-bold tracking-tight text-foreground">
+        Elite Event Assistant
       </h2>
-      <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        Plan, coordinate, and execute events at the Pyramid of Tirana. Paste a client inquiry or
-        describe a request to get started.
+      <p className="mx-auto mt-4 max-w-lg text-sm text-muted-foreground/70 leading-relaxed">
+        Curate unforgettable experiences at the Pyramid of Tirana. Paste a formal inquiry or share
+        your vision to begin.
       </p>
-      <div className="mx-auto mt-8 grid max-w-2xl gap-2 text-left sm:grid-cols-3">
+
+      <div className="mx-auto mt-12 grid max-w-3xl gap-4 text-left sm:grid-cols-3 px-4">
         {SAMPLE_PROMPTS.map((p) => (
-          <div
+          <button
             key={p}
-            className="rounded-lg border border-border bg-card/60 p-3 text-xs leading-snug text-muted-foreground"
+            className="group glass-card rounded-2xl p-4 text-xs leading-relaxed text-muted-foreground/60 transition-all duration-300 hover:text-primary hover:ring-primary/40 hover:scale-[1.02]"
           >
-            <span className="text-primary">→</span> {p}
-          </div>
+            <div className="mb-2 flex h-6 w-6 items-center justify-center rounded-lg bg-white/5 text-primary/40 transition-colors group-hover:bg-primary/20 group-hover:text-primary">
+              <CornerDownLeft className="h-3 w-3" />
+            </div>
+            {p}
+          </button>
         ))}
       </div>
     </div>
