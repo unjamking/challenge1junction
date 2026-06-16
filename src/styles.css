@@ -1,0 +1,138 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-border: var(--sidebar-border);
+
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+/* Pyramid of Tirana brand palette
+   Midnight Tirana sky, illuminated concrete, signature orange cube */
+:root {
+  --radius: 0.5rem;
+
+  --background: oklch(0.19 0.025 255);      /* deep night blue */
+  --foreground: oklch(0.96 0.008 90);       /* warm illuminated white */
+
+  --card: oklch(0.23 0.028 255);
+  --card-foreground: oklch(0.96 0.008 90);
+
+  --popover: oklch(0.23 0.028 255);
+  --popover-foreground: oklch(0.96 0.008 90);
+
+  --primary: oklch(0.72 0.18 50);           /* signature orange cube */
+  --primary-foreground: oklch(0.16 0.02 255);
+
+  --secondary: oklch(0.30 0.03 255);
+  --secondary-foreground: oklch(0.96 0.008 90);
+
+  --muted: oklch(0.27 0.025 255);
+  --muted-foreground: oklch(0.70 0.018 240);
+
+  --accent: oklch(0.62 0.14 235);           /* lit blue cube */
+  --accent-foreground: oklch(0.98 0.005 90);
+
+  --destructive: oklch(0.6 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: oklch(0.32 0.025 255);
+  --input: oklch(0.29 0.025 255);
+  --ring: oklch(0.72 0.18 50);
+
+  --sidebar: oklch(0.15 0.022 255);
+  --sidebar-foreground: oklch(0.90 0.01 90);
+  --sidebar-accent: oklch(0.25 0.028 255);
+  --sidebar-border: oklch(0.28 0.025 255);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html, body, #root {
+    height: 100%;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  .text-display { font-family: var(--font-display); letter-spacing: -0.02em; }
+  .bg-grain {
+    background-image:
+      radial-gradient(oklch(0.78 0.14 70 / 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .prose-chat {
+    line-height: 1.65;
+  }
+  .prose-chat h1, .prose-chat h2, .prose-chat h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    margin-top: 1.2em;
+    margin-bottom: 0.5em;
+    color: var(--color-foreground);
+  }
+  .prose-chat h2 { font-size: 1.15rem; }
+  .prose-chat h3 { font-size: 1rem; color: var(--color-primary); }
+  .prose-chat p { margin: 0.5em 0; }
+  .prose-chat ul, .prose-chat ol { margin: 0.5em 0; padding-left: 1.25em; }
+  .prose-chat li { margin: 0.2em 0; }
+  .prose-chat ul li { list-style: disc; }
+  .prose-chat ol li { list-style: decimal; }
+  .prose-chat strong { color: var(--color-primary); font-weight: 600; }
+  .prose-chat code {
+    background: var(--color-muted);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  .prose-chat hr { border-color: var(--color-border); margin: 1em 0; }
+  .prose-chat table { border-collapse: collapse; margin: 0.5em 0; }
+  .prose-chat th, .prose-chat td {
+    border: 1px solid var(--color-border);
+    padding: 0.4em 0.7em;
+    text-align: left;
+  }
+  .prose-chat th { background: var(--color-muted); }
+}
