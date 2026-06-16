@@ -139,9 +139,7 @@ export function ChatWindow({ threadId, initialMessages, initialTitle }: ChatWind
 
 function MessageBubble({ message }: { message: UIMessage }) {
   const isUser = message.role === "user";
-  const text = message.parts
-    .map((p) => (p.type === "text" ? p.text : ""))
-    .join("");
+  const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
 
   if (isUser) {
     return (
@@ -181,8 +179,8 @@ function EmptyState() {
         Event Operations Assistant
       </h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        Plan, coordinate, and execute events at the Pyramid of Tirana. Paste a client
-        inquiry or describe a request to get started.
+        Plan, coordinate, and execute events at the Pyramid of Tirana. Paste a client inquiry or
+        describe a request to get started.
       </p>
       <div className="mx-auto mt-8 grid max-w-2xl gap-2 text-left sm:grid-cols-3">
         {SAMPLE_PROMPTS.map((p) => (

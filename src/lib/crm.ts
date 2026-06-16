@@ -9,12 +9,7 @@ export type EventStatus =
   | "cancelled";
 
 export type TaskStatus = "todo" | "in_progress" | "done";
-export type Team =
-  | "technical"
-  | "catering"
-  | "security"
-  | "cleaning"
-  | "coordination";
+export type Team = "technical" | "catering" | "security" | "cleaning" | "coordination";
 
 export interface Space {
   id: string;
@@ -48,6 +43,7 @@ export interface EventRequest {
   status: EventStatus;
   notes: string | null;
   thread_id: string | null;
+  proposal_pdf_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -72,13 +68,34 @@ export const EVENT_STATUSES: EventStatus[] = [
   "cancelled",
 ];
 
-export const TEAMS: Team[] = [
-  "technical",
-  "catering",
-  "security",
-  "cleaning",
-  "coordination",
-];
+export const TEAMS: Team[] = ["technical", "catering", "security", "cleaning", "coordination"];
+
+export const TASK_TEMPLATES: Record<string, Partial<Task>[]> = {
+  Conference: [
+    { team: "technical", title: "Setup Stage & AV" },
+    { team: "technical", title: "Sound Check with Speakers" },
+    { team: "coordination", title: "Registration Desk Setup" },
+    { team: "catering", title: "Coffee Break Prep" },
+    { team: "security", title: "Main Entrance Briefing" },
+  ],
+  Gala: [
+    { team: "technical", title: "Atmospheric Lighting Setup" },
+    { team: "catering", title: "Menu Tasting & Finalization" },
+    { team: "catering", title: "Table Setting & Linens" },
+    { team: "coordination", title: "Seating Chart Finalization" },
+    { team: "cleaning", title: "Post-Event Deep Clean" },
+  ],
+  Workshop: [
+    { team: "technical", title: "Projector & WiFi Check" },
+    { team: "coordination", title: "Materials & Stationery Prep" },
+    { team: "catering", title: "Light Lunch Setup" },
+  ],
+  "Cocktail Reception": [
+    { team: "catering", title: "Bar Station Setup" },
+    { team: "technical", title: "BGM Playlist & Sound System" },
+    { team: "security", title: "VIP Entrance Management" },
+  ],
+};
 
 // SPACES
 export async function listSpaces(): Promise<Space[]> {
@@ -100,6 +117,37 @@ export async function listEquipment(): Promise<Equipment[]> {
   return (data ?? []) as Equipment[];
 }
 
+export async function checkEquipmentAvailability(
+  equipmentId: string,
+  date: string,
+  excludeEventId?: string,
+): Promise<{ available: number; reserved: number }> {
+  const { data: eq, error: eqErr } = await supabase
+    .from("equipment")
+    .select("quantity_available")
+    .eq("id", equipmentId)
+    .single();
+  if (eqErr) throw eqErr;
+
+  let q = supabase
+    .from("event_equipment")
+    .select("quantity, event_requests!inner(preferred_date, status)")
+    .eq("equipment_id", equipmentId)
+    .eq("event_requests.preferred_date", date)
+    .in("event_requests.status", ["proposal", "confirmed", "in_progress"]);
+
+  if (excludeEventId) q = q.neq("event_id", excludeEventId);
+
+  const { data, error } = await q;
+  if (error) throw error;
+
+  const reserved = (data ?? []).reduce((sum, r) => sum + r.quantity, 0);
+  return {
+    available: eq.quantity_available - reserved,
+    reserved,
+  };
+}
+
 // EVENT REQUESTS
 export async function listEventRequests(): Promise<EventRequest[]> {
   const { data, error } = await supabase
@@ -111,11 +159,7 @@ export async function listEventRequests(): Promise<EventRequest[]> {
 }
 
 export async function getEventRequest(id: string): Promise<EventRequest> {
-  const { data, error } = await supabase
-    .from("event_requests")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const { data, error } = await supabase.from("event_requests").select("*").eq("id", id).single();
   if (error) throw error;
   return data as EventRequest;
 }
@@ -123,12 +167,13 @@ export async function getEventRequest(id: string): Promise<EventRequest> {
 export async function createEventRequest(
   input: Partial<EventRequest> & { client_name: string; event_type: string },
 ): Promise<EventRequest> {
-  const { data, error } = await supabase
-    .from("event_requests")
-    .insert(input)
-    .select()
-    .single();
+  const { data, error } = await supabase.from("event_requests").insert(input).select().single();
   if (error) throw error;
+
+  if (data) {
+    await applyTaskTemplates(data.id, data.event_type);
+  }
+
   return data as EventRequest;
 }
 
@@ -136,6 +181,12 @@ export async function updateEventRequest(
   id: string,
   patch: Partial<EventRequest>,
 ): Promise<EventRequest> {
+  const { data: old } = await supabase
+    .from("event_requests")
+    .select("event_type, space_id")
+    .eq("id", id)
+    .single();
+
   const { data, error } = await supabase
     .from("event_requests")
     .update(patch)
@@ -143,6 +194,11 @@ export async function updateEventRequest(
     .select()
     .single();
   if (error) throw error;
+
+  if (data && (patch.event_type !== old?.event_type || patch.space_id !== old?.space_id)) {
+    await applyTaskTemplates(data.id, data.event_type);
+  }
+
   return data as EventRequest;
 }
 
@@ -168,6 +224,27 @@ export async function checkSpaceAvailability(
   return (data ?? []) as EventRequest[];
 }
 
+export async function applyTaskTemplates(eventId: string, eventType: string) {
+  const templates = TASK_TEMPLATES[eventType] || [];
+  if (templates.length === 0) return;
+
+  // Check if tasks already exist to avoid duplicates
+  const { data: existing } = await supabase.from("tasks").select("title").eq("event_id", eventId);
+  const existingTitles = new Set((existing ?? []).map((t) => t.title));
+
+  const tasksToCreate = templates
+    .filter((t) => !existingTitles.has(t.title!))
+    .map((t) => ({
+      ...t,
+      event_id: eventId,
+    }));
+
+  if (tasksToCreate.length > 0) {
+    const { error } = await supabase.from("tasks").insert(tasksToCreate);
+    if (error) console.error("Error applying templates:", error);
+  }
+}
+
 // TASKS
 export async function listTasksForEvent(eventId: string): Promise<Task[]> {
   const { data, error } = await supabase
@@ -191,11 +268,7 @@ export async function listAllTasks(): Promise<Task[]> {
 export async function createTask(
   input: Partial<Task> & { event_id: string; team: Team; title: string },
 ): Promise<Task> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .insert(input)
-    .select()
-    .single();
+  const { data, error } = await supabase.from("tasks").insert(input).select().single();
   if (error) throw error;
   return data as Task;
 }
@@ -218,9 +291,7 @@ export interface EventEquipmentRow {
   quantity: number;
 }
 
-export async function listEventEquipment(
-  eventId: string,
-): Promise<EventEquipmentRow[]> {
+export async function listEventEquipment(eventId: string): Promise<EventEquipmentRow[]> {
   const { data, error } = await supabase
     .from("event_equipment")
     .select("*")
@@ -229,11 +300,7 @@ export async function listEventEquipment(
   return (data ?? []) as EventEquipmentRow[];
 }
 
-export async function reserveEquipment(
-  eventId: string,
-  equipmentId: string,
-  quantity: number,
-) {
+export async function reserveEquipment(eventId: string, equipmentId: string, quantity: number) {
   const { error } = await supabase
     .from("event_equipment")
     .insert({ event_id: eventId, equipment_id: equipmentId, quantity });
@@ -265,17 +332,10 @@ export function generateProposal(
       : "TBD";
   const hours =
     ev.start_time && ev.end_time
-      ? Math.max(
-          1,
-          (parseInt(ev.end_time.slice(0, 2)) -
-            parseInt(ev.start_time.slice(0, 2))) || 4,
-        )
+      ? Math.max(1, parseInt(ev.end_time.slice(0, 2)) - parseInt(ev.start_time.slice(0, 2)) || 4)
       : 4;
   const spaceCost = space ? space.hourly_rate * hours : 0;
-  const equipCost = equipment.reduce(
-    (s, e) => s + e.quantity * e.daily_rate,
-    0,
-  );
+  const equipCost = equipment.reduce((s, e) => s + e.quantity * e.daily_rate, 0);
   const total = spaceCost + equipCost;
 
   return `# Event Proposal — Pyramid of Tirana
@@ -302,10 +362,7 @@ Rate: €${space.hourly_rate}/hour × ${hours}h = **€${spaceCost.toFixed(2)}**
 ${
   equipment.length
     ? equipment
-        .map(
-          (e) =>
-            `- ${e.name} × ${e.quantity} — €${(e.quantity * e.daily_rate).toFixed(2)}`,
-        )
+        .map((e) => `- ${e.name} × ${e.quantity} — €${(e.quantity * e.daily_rate).toFixed(2)}`)
         .join("\n")
     : "_No equipment reserved._"
 }

@@ -17,9 +17,7 @@ function NotFoundComponent() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <p className="text-xs uppercase tracking-[0.25em] text-primary">404</p>
-        <h1 className="text-display mt-2 text-3xl font-semibold text-foreground">
-          Page not found
-        </h1>
+        <h1 className="text-display mt-2 text-3xl font-semibold text-foreground">Page not found</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           This route doesn't exist or the event request was removed.
         </p>

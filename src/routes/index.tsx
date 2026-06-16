@@ -49,15 +49,13 @@ function Landing() {
       <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/40 bg-primary/10 text-primary">
         <Sparkles className="h-6 w-6" />
       </div>
-      <p className="text-[11px] uppercase tracking-[0.25em] text-primary">
-        Pyramid of Tirana
-      </p>
+      <p className="text-[11px] uppercase tracking-[0.25em] text-primary">Pyramid of Tirana</p>
       <h1 className="text-display mt-2 max-w-xl text-4xl font-semibold tracking-tight text-foreground">
         Event Operations, end to end.
       </h1>
       <p className="mt-3 max-w-lg text-sm text-muted-foreground">
-        From the first inquiry to the day-of run sheet — your AI assistant for
-        planning, coordinating, and executing events at the Pyramid.
+        From the first inquiry to the day-of run sheet — your AI assistant for planning,
+        coordinating, and executing events at the Pyramid.
       </p>
       <button
         onClick={() => create.mutate()}

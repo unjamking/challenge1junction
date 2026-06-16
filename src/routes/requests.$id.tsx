@@ -14,6 +14,7 @@ import {
   updateTask,
   deleteTask,
   checkSpaceAvailability,
+  checkEquipmentAvailability,
   generateProposal,
   EVENT_STATUSES,
   TEAMS,
@@ -29,7 +30,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Copy,
+  Download,
+  Loader2,
 } from "lucide-react";
+import { exportProposalAsPDF } from "@/lib/pdf";
 
 export const Route = createFileRoute("/requests/$id")({
   component: RequestDetail,
@@ -72,6 +76,11 @@ function RequestDetail() {
   const [showProposal, setShowProposal] = useState(false);
   const [equipPick, setEquipPick] = useState("");
   const [equipQty, setEquipQty] = useState(1);
+  const [checkingEquip, setCheckingEquip] = useState(false);
+  const [equipAvailability, setEquipAvailability] = useState<{
+    available: number;
+    reserved: number;
+  } | null>(null);
 
   if (!ev) {
     return (
@@ -104,6 +113,20 @@ function RequestDetail() {
     };
   });
 
+  const checkEquip = async (eqId: string) => {
+    if (!eqId || !ev.preferred_date) {
+      setEquipAvailability(null);
+      return;
+    }
+    setCheckingEquip(true);
+    try {
+      const res = await checkEquipmentAvailability(eqId, ev.preferred_date, id);
+      setEquipAvailability(res);
+    } finally {
+      setCheckingEquip(false);
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto">
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-8 py-5 backdrop-blur">
@@ -115,19 +138,13 @@ function RequestDetail() {
         </button>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.25em] text-primary">
-              {ev.client_name}
-            </p>
-            <h1 className="text-display text-2xl font-semibold">
-              {ev.event_type}
-            </h1>
+            <p className="text-[10px] uppercase tracking-[0.25em] text-primary">{ev.client_name}</p>
+            <h1 className="text-display text-2xl font-semibold">{ev.event_type}</h1>
           </div>
           <div className="flex items-center gap-2">
             <select
               value={ev.status}
-              onChange={(e) =>
-                update({ status: e.target.value as EventStatus })
-              }
+              onChange={(e) => update({ status: e.target.value as EventStatus })}
               className="rounded-md border border-border bg-input px-3 py-2 text-sm"
             >
               {EVENT_STATUSES.map((s) => (
@@ -175,9 +192,7 @@ function RequestDetail() {
                 label="Attendance"
                 value={ev.attendance?.toString() ?? ""}
                 type="number"
-                onSave={(v) =>
-                  update({ attendance: v ? parseInt(v) : null })
-                }
+                onSave={(v) => update({ attendance: v ? parseInt(v) : null })}
               />
               <Editable
                 label="Date"
@@ -204,16 +219,12 @@ function RequestDetail() {
             <div className="flex items-center gap-3">
               <select
                 value={ev.space_id ?? ""}
-                onChange={(e) =>
-                  update({ space_id: e.target.value || null })
-                }
+                onChange={(e) => update({ space_id: e.target.value || null })}
                 className="flex-1 rounded-md border border-border bg-input px-3 py-2 text-sm"
               >
                 <option value="">— Select a space —</option>
                 {spaces
-                  .filter(
-                    (s) => !ev.attendance || s.capacity >= ev.attendance,
-                  )
+                  .filter((s) => !ev.attendance || s.capacity >= ev.attendance)
                   .map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name} (cap. {s.capacity}, €{s.hourly_rate}/h)
@@ -237,8 +248,7 @@ function RequestDetail() {
                 <div>
                   {conflicts.length ? (
                     <>
-                      <strong>Conflict:</strong> {conflicts.length} other
-                      booking(s) on this date.
+                      <strong>Conflict:</strong> {conflicts.length} other booking(s) on this date.
                     </>
                   ) : (
                     <>Space is available on {ev.preferred_date}.</>
@@ -252,13 +262,16 @@ function RequestDetail() {
             <div className="mb-3 flex items-center gap-2">
               <select
                 value={equipPick}
-                onChange={(e) => setEquipPick(e.target.value)}
+                onChange={(e) => {
+                  setEquipPick(e.target.value);
+                  checkEquip(e.target.value);
+                }}
                 className="flex-1 rounded-md border border-border bg-input px-3 py-2 text-sm"
               >
                 <option value="">— Pick equipment —</option>
                 {equipment.map((eq) => (
                   <option key={eq.id} value={eq.id}>
-                    {eq.category} · {eq.name} (avail. {eq.quantity_available})
+                    {eq.category} · {eq.name}
                   </option>
                 ))}
               </select>
@@ -270,11 +283,14 @@ function RequestDetail() {
                 className="w-20 rounded-md border border-border bg-input px-3 py-2 text-sm"
               />
               <button
-                disabled={!equipPick}
+                disabled={
+                  !equipPick || (equipAvailability && equipQty > equipAvailability.available)
+                }
                 onClick={async () => {
                   await reserveEquipment(id, equipPick, equipQty);
                   setEquipPick("");
                   setEquipQty(1);
+                  setEquipAvailability(null);
                   refreshAll();
                 }}
                 className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
@@ -282,24 +298,46 @@ function RequestDetail() {
                 Reserve
               </button>
             </div>
-            {reserved.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No equipment reserved yet.
+
+            {checkingEquip && (
+              <p className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" /> Checking availability...
               </p>
+            )}
+
+            {equipAvailability && (
+              <div
+                className={`mb-3 rounded-md border p-2 text-xs ${
+                  equipQty > equipAvailability.available
+                    ? "border-destructive/40 bg-destructive/5 text-destructive"
+                    : "border-emerald-500/30 bg-emerald-500/5 text-emerald-300"
+                }`}
+              >
+                {equipQty > equipAvailability.available ? (
+                  <p className="flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> Overbooked! Only{" "}
+                    {equipAvailability.available} available on this date.
+                  </p>
+                ) : (
+                  <p className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" /> Sufficient stock (
+                    {equipAvailability.available} remaining).
+                  </p>
+                )}
+              </div>
+            )}
+
+            {reserved.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No equipment reserved yet.</p>
             ) : (
               <ul className="divide-y divide-border">
                 {reserved.map((r) => {
                   const item = equipment.find((e) => e.id === r.equipment_id);
                   return (
-                    <li
-                      key={r.id}
-                      className="flex items-center justify-between py-2 text-sm"
-                    >
+                    <li key={r.id} className="flex items-center justify-between py-2 text-sm">
                       <span>
-                        <span className="text-muted-foreground">
-                          {item?.category}
-                        </span>{" "}
-                        · {item?.name} × {r.quantity}
+                        <span className="text-muted-foreground">{item?.category}</span> ·{" "}
+                        {item?.name} × {r.quantity}
                       </span>
                       <button
                         onClick={async () => {
@@ -331,17 +369,16 @@ function RequestDetail() {
         {/* TASKS */}
         <section>
           <Card title="Task coordination">
-            <TaskList
-              eventId={id}
-              tasks={tasks}
-              onChange={refreshAll}
-            />
+            <TaskList eventId={id} tasks={tasks} onChange={refreshAll} />
           </Card>
         </section>
       </div>
 
       {showProposal && (
         <ProposalModal
+          ev={ev}
+          space={space}
+          equipment={proposalEquipment}
           text={generateProposal(ev, space, proposalEquipment)}
           onClose={() => setShowProposal(false)}
           onSend={async () => {
@@ -354,13 +391,7 @@ function RequestDetail() {
   );
 }
 
-function Card({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-border bg-card p-5">
       <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -437,21 +468,13 @@ function TaskList({
                     checked={t.status === "done"}
                     onChange={async (e) => {
                       await updateTask(t.id, {
-                        status: e.target.checked
-                          ? "done"
-                          : ("todo" as TaskStatus),
+                        status: e.target.checked ? "done" : ("todo" as TaskStatus),
                       });
                       onChange();
                     }}
                   />
                   <div className="flex-1">
-                    <p
-                      className={
-                        t.status === "done"
-                          ? "line-through text-muted-foreground"
-                          : ""
-                      }
-                    >
+                    <p className={t.status === "done" ? "line-through text-muted-foreground" : ""}>
                       {t.title}
                     </p>
                     {(t.assignee || t.due_date) && (
@@ -553,10 +576,16 @@ function TaskList({
 }
 
 function ProposalModal({
+  ev,
+  space,
+  equipment,
   text,
   onClose,
   onSend,
 }: {
+  ev: EventRequest;
+  space: Space | undefined;
+  equipment: { name: string; quantity: number; daily_rate: number }[];
   text: string;
   onClose: () => void;
   onSend: () => void;
@@ -573,6 +602,12 @@ function ProposalModal({
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <h2 className="text-display font-semibold">Proposal preview</h2>
           <div className="flex gap-2">
+            <button
+              onClick={() => exportProposalAsPDF(ev, space, equipment)}
+              className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-accent"
+            >
+              <Download className="h-3 w-3" /> Download PDF
+            </button>
             <button
               onClick={() => navigator.clipboard.writeText(text)}
               className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-accent"

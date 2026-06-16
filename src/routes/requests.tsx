@@ -11,7 +11,8 @@ import {
   type EventRequest,
   type EventStatus,
 } from "@/lib/crm";
-import { Plus, Trash2, Calendar, Users } from "lucide-react";
+import { Plus, Trash2, Calendar, Users, FileImport, Loader2 } from "lucide-react";
+import { parseInquiry } from "@/lib/import.server";
 
 export const Route = createFileRoute("/requests")({
   component: RequestsPage,
@@ -47,6 +48,8 @@ function RequestsPage() {
     queryFn: listSpaces,
   });
   const [showNew, setShowNew] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [initialData, setInitialData] = useState<Partial<EventRequest> | null>(null);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["event_requests"] });
 
@@ -59,17 +62,26 @@ function RequestsPage() {
     <div className="h-full overflow-y-auto">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/95 px-8 py-5 backdrop-blur">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.25em] text-primary">
-            Pipeline
-          </p>
+          <p className="text-[10px] uppercase tracking-[0.25em] text-primary">Pipeline</p>
           <h1 className="text-display text-2xl font-semibold">Event requests</h1>
         </div>
-        <button
-          onClick={() => setShowNew(true)}
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-        >
-          <Plus className="h-4 w-4" /> New request
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowImport(true)}
+            className="flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium hover:bg-accent"
+          >
+            <FileImport className="h-4 w-4" /> Import Inquiry
+          </button>
+          <button
+            onClick={() => {
+              setInitialData(null);
+              setShowNew(true);
+            }}
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" /> New request
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-2 xl:grid-cols-3">
@@ -79,9 +91,7 @@ function RequestsPage() {
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {STATUS_LABEL[col.status]}
               </h2>
-              <span className="text-xs text-muted-foreground">
-                {col.items.length}
-              </span>
+              <span className="text-xs text-muted-foreground">{col.items.length}</span>
             </div>
             {col.items.length === 0 && (
               <p className="rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-xs text-muted-foreground">
@@ -99,9 +109,7 @@ function RequestsPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <h3 className="font-medium leading-tight">{ev.event_type}</h3>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {ev.client_name}
-                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{ev.client_name}</p>
                     </div>
                     <button
                       onClick={(e) => {
@@ -128,9 +136,7 @@ function RequestsPage() {
                       </span>
                     )}
                     {space && (
-                      <span className="rounded bg-background/60 px-1.5 py-0.5">
-                        {space.name}
-                      </span>
+                      <span className="rounded bg-background/60 px-1.5 py-0.5">{space.name}</span>
                     )}
                   </div>
                 </article>
@@ -143,6 +149,7 @@ function RequestsPage() {
       {showNew && (
         <NewRequestModal
           spaces={spaces}
+          initialData={initialData}
           onClose={() => setShowNew(false)}
           onCreated={(ev) => {
             setShowNew(false);
@@ -151,30 +158,103 @@ function RequestsPage() {
           }}
         />
       )}
+
+      {showImport && (
+        <ImportModal
+          onClose={() => setShowImport(false)}
+          onParsed={(data) => {
+            setInitialData(data);
+            setShowImport(false);
+            setShowNew(true);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ImportModal({
+  onClose,
+  onParsed,
+}: {
+  onClose: () => void;
+  onParsed: (data: Partial<EventRequest>) => void;
+}) {
+  const [text, setText] = useState("");
+  const [parsing, setParsing] = useState(false);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-display text-xl font-semibold">Import Inquiry</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Paste an email or WhatsApp inquiry to automatically extract details.
+        </p>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Paste inquiry text here..."
+          className="mt-4 h-48 w-full rounded-md border border-border bg-input p-3 text-sm"
+        />
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="rounded-md px-4 py-2 text-sm text-muted-foreground hover:text-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => {
+              setParsing(true);
+              try {
+                const data = await parseInquiry({ data: text });
+                onParsed(data as Partial<EventRequest>);
+              } catch (e) {
+                console.error(e);
+                alert("Failed to parse inquiry.");
+              } finally {
+                setParsing(false);
+              }
+            }}
+            disabled={!text || parsing}
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Process Inquiry"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 function NewRequestModal({
   spaces,
+  initialData,
   onClose,
   onCreated,
 }: {
   spaces: { id: string; name: string; capacity: number }[];
+  initialData: Partial<EventRequest> | null;
   onClose: () => void;
   onCreated: (ev: EventRequest) => void;
 }) {
   const [form, setForm] = useState({
-    client_name: "",
-    client_email: "",
-    client_phone: "",
-    event_type: "",
-    attendance: "",
-    preferred_date: "",
-    start_time: "",
-    end_time: "",
+    client_name: initialData?.client_name ?? "",
+    client_email: initialData?.client_email ?? "",
+    client_phone: initialData?.client_phone ?? "",
+    event_type: initialData?.event_type ?? "",
+    attendance: initialData?.attendance?.toString() ?? "",
+    preferred_date: initialData?.preferred_date ?? "",
+    start_time: initialData?.start_time ?? "",
+    end_time: initialData?.end_time ?? "",
     space_id: "",
-    notes: "",
+    notes: initialData?.notes ?? "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -260,9 +340,7 @@ function NewRequestModal({
             <input
               type="date"
               value={form.preferred_date}
-              onChange={(e) =>
-                setForm({ ...form, preferred_date: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, preferred_date: e.target.value })}
               className="input"
             />
           </Field>

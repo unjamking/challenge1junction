@@ -32,9 +32,7 @@ function TasksPage() {
   return (
     <div className="h-full overflow-y-auto">
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-8 py-5 backdrop-blur">
-        <p className="text-[10px] uppercase tracking-[0.25em] text-primary">
-          Operations
-        </p>
+        <p className="text-[10px] uppercase tracking-[0.25em] text-primary">Operations</p>
         <h1 className="text-display text-2xl font-semibold">All tasks</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {tasks.length} task(s) across {TEAMS.length} teams.
@@ -43,13 +41,9 @@ function TasksPage() {
 
       <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-3">
         {STATUSES.map((status) => (
-          <section
-            key={status}
-            className="rounded-lg border border-border bg-card/40 p-4"
-          >
+          <section key={status} className="rounded-lg border border-border bg-card/40 p-4">
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {status.replace("_", " ")} ·{" "}
-              {tasks.filter((t) => t.status === status).length}
+              {status.replace("_", " ")} · {tasks.filter((t) => t.status === status).length}
             </h2>
             <ul className="space-y-2">
               {tasks
@@ -107,9 +101,7 @@ function TasksPage() {
                   );
                 })}
               {tasks.filter((t) => t.status === status).length === 0 && (
-                <p className="px-1 py-4 text-center text-xs text-muted-foreground">
-                  Nothing here.
-                </p>
+                <p className="px-1 py-4 text-center text-xs text-muted-foreground">Nothing here.</p>
               )}
             </ul>
           </section>

@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { listSpaces, listEventRequests } from "@/lib/crm";
-import { Users, Calendar } from "lucide-react";
+import { listSpaces, listEventRequests, type Space } from "@/lib/crm";
+import { Users, Calendar, Eye } from "lucide-react";
+import { useState } from "react";
+import { SpaceCalendarModal } from "@/components/SpaceCalendar";
 
 export const Route = createFileRoute("/spaces")({
   component: SpacesPage,
@@ -24,12 +26,12 @@ function SpacesPage() {
     queryFn: listEventRequests,
   });
 
+  const [viewingSpace, setViewingSpace] = useState<Space | null>(null);
+
   return (
     <div className="h-full overflow-y-auto">
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-8 py-5 backdrop-blur">
-        <p className="text-[10px] uppercase tracking-[0.25em] text-primary">
-          Venue
-        </p>
+        <p className="text-[10px] uppercase tracking-[0.25em] text-primary">Venue</p>
         <h1 className="text-display text-2xl font-semibold">Spaces</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {spaces.length} bookable spaces across the Pyramid.
@@ -45,33 +47,32 @@ function SpacesPage() {
                 e.preferred_date &&
                 ["proposal", "confirmed", "in_progress"].includes(e.status),
             )
-            .sort((a, b) =>
-              (a.preferred_date ?? "").localeCompare(b.preferred_date ?? ""),
-            )
+            .sort((a, b) => (a.preferred_date ?? "").localeCompare(b.preferred_date ?? ""))
             .slice(0, 4);
           const tint = COLOR_MAP[s.accent_color ?? "white"] ?? COLOR_MAP.white;
           return (
-            <article
-              key={s.id}
-              className={`rounded-lg border p-5 transition ${tint}`}
-            >
+            <article key={s.id} className={`rounded-lg border p-5 transition ${tint}`}>
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                     {s.space_type}
                   </p>
-                  <h2 className="text-display text-lg font-semibold">
-                    {s.name}
-                  </h2>
+                  <h2 className="text-display text-lg font-semibold">{s.name}</h2>
                 </div>
-                <span className="rounded-md bg-background/60 px-2 py-1 text-xs">
-                  €{s.hourly_rate}/h
-                </span>
+                <div className="flex flex-col items-end gap-2">
+                  <span className="rounded-md bg-background/60 px-2 py-1 text-xs">
+                    €{s.hourly_rate}/h
+                  </span>
+                  <button
+                    onClick={() => setViewingSpace(s)}
+                    className="flex items-center gap-1.5 rounded-md bg-background/80 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-foreground hover:bg-background"
+                  >
+                    <Eye className="h-3 w-3" /> Availability
+                  </button>
+                </div>
               </div>
               {s.description && (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {s.description}
-                </p>
+                <p className="mt-2 text-sm text-muted-foreground">{s.description}</p>
               )}
               <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
                 <Users className="h-3 w-3" /> Capacity {s.capacity}
@@ -86,15 +87,10 @@ function SpacesPage() {
                 ) : (
                   <ul className="space-y-1">
                     {upcoming.map((e) => (
-                      <li
-                        key={e.id}
-                        className="flex items-center gap-2 text-xs"
-                      >
+                      <li key={e.id} className="flex items-center gap-2 text-xs">
                         <Calendar className="h-3 w-3 text-primary/80" />
                         <span className="font-medium">{e.preferred_date}</span>
-                        <span className="text-muted-foreground">
-                          {e.event_type}
-                        </span>
+                        <span className="text-muted-foreground">{e.event_type}</span>
                       </li>
                     ))}
                   </ul>
@@ -104,6 +100,14 @@ function SpacesPage() {
           );
         })}
       </div>
+
+      {viewingSpace && (
+        <SpaceCalendarModal
+          space={viewingSpace}
+          events={events}
+          onClose={() => setViewingSpace(null)}
+        />
+      )}
     </div>
   );
 }

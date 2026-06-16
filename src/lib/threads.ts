@@ -18,11 +18,7 @@ export async function listThreads(): Promise<ThreadRow[]> {
 }
 
 export async function createThread(): Promise<ThreadRow> {
-  const { data, error } = await supabase
-    .from("threads")
-    .insert({})
-    .select()
-    .single();
+  const { data, error } = await supabase.from("threads").insert({}).select().single();
   if (error) throw error;
   return data;
 }
@@ -54,10 +50,7 @@ export async function getThreadMessages(threadId: string): Promise<UIMessage[]> 
   }));
 }
 
-export async function saveMessage(
-  threadId: string,
-  message: UIMessage,
-) {
+export async function saveMessage(threadId: string, message: UIMessage) {
   const { error } = await supabase.from("messages").insert({
     thread_id: threadId,
     role: message.role,
